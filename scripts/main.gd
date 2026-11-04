@@ -294,6 +294,7 @@ func _join_dialog() -> void:
 func _on_peer_connected(id: int) -> void:
 	_show_message("Jogador %d entrou." % id)
 	_rpc_spawn_remote.rpc(id)
+	_rpc_spawn_remote.rpc(1)
 
 func _on_peer_disconnected(id: int) -> void:
 	if remote_players.has(id):
