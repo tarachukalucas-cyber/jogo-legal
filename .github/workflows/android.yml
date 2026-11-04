@@ -1,0 +1,25 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export with Godot
+        uses: firebelley/godot-export@v6
+        with:
+          godot_executable_download_url: https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
+          godot_export_templates_download_url: https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz
+          relative_project_path: ./
+          export配: Android
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ilha-viva-android
+          path: build/*.apk
+          if-no-files-found: error
