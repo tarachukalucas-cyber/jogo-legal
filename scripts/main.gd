@@ -14,6 +14,7 @@ var hud: Label
 var status: Label
 var message: Label
 var joystick := Vector2.ZERO
+var virtual_stick: Control
 var peer := ENetMultiplayerPeer.new()
 var remote_players := {}
 
@@ -100,7 +101,7 @@ func _make_tree(pos: Vector3) -> void:
 	mesh.height = 2.8
 	crown.mesh = mesh
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.16, randf_range(0.34, 0.24), 0.13)
+	mat.albedo_color = Color(0.16, randf_range(0.24, 0.34), 0.13)
 	crown.material_override = mat
 	crown.position = pos + Vector3(0, 3.2, 0)
 	add_child(crown)
@@ -178,11 +179,19 @@ func _build_ui() -> void:
 	message.position = Vector2(16, 238)
 	message.add_theme_color_override("font_color", Color.WHITE)
 	layer.add_child(message)
-	var stick := TouchScreenButton.new()
-	stick.position = Vector2(90, 560)
-	stick.action = "move_forward"
-	stick.visibility_mode = TouchScreenButton.VISIBILITY_TOUCHSCREEN_ONLY
-	layer.add_child(stick)
+	virtual_stick = Control.new()
+	virtual_stick.set_script(load("res://scripts/virtual_stick.gd"))
+	virtual_stick.anchor_left = 0.0
+	virtual_stick.anchor_top = 1.0
+	virtual_stick.anchor_right = 0.0
+	virtual_stick.anchor_bottom = 1.0
+	virtual_stick.offset_left = 24
+	virtual_stick.offset_top = -224
+	virtual_stick.offset_right = 224
+	virtual_stick.offset_bottom = -24
+	virtual_stick.custom_minimum_size = Vector2(200, 200)
+	layer.add_child(virtual_stick)
+	virtual_stick.direction_changed.connect(func(value: Vector2): joystick = value)
 	_update_hud()
 
 func _add_action(parent: HBoxContainer, title: String, callback: Callable) -> void:
