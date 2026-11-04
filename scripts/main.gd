@@ -52,8 +52,11 @@ func _physics_process(_delta: float) -> void:
 	else:
 		player.velocity.y = -0.5
 	player.move_and_slide()
-	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-		_broadcast_positions()
+	if multiplayer.multiplayer_peer != null:
+		if multiplayer.is_server():
+			_broadcast_positions()
+		else:
+			_rpc_submit_position.rpc_id(1, player.global_position)
 
 func _build_world() -> void:
 	var ground := _make_box(Vector3(0, -0.6, 0), Vector3(100, 1, 100), Color(0.28, 0.52, 0.27))
@@ -82,6 +85,14 @@ func _build_world() -> void:
 	add_child(env)
 
 func _make_box(pos: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
+	var body := StaticBody3D.new()
+	body.position = pos
+	add_child(body)
+	var collision := CollisionShape3D.new()
+	var box_shape := BoxShape3D.new()
+	box_shape.size = size
+	collision.shape = box_shape
+	body.add_child(collision)
 	var item := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = size
@@ -89,8 +100,7 @@ func _make_box(pos: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	item.material_override = mat
-	item.position = pos
-	add_child(item)
+	body.add_child(item)
 	return item
 
 func _make_tree(pos: Vector3) -> void:
@@ -309,6 +319,15 @@ func _broadcast_positions() -> void:
 		_rpc_remote_position.rpc_id(id, multiplayer.get_unique_id(), player.global_position)
 
 @rpc("any_peer", "unreliable")
+func _rpc_submit_position(pos: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender := multiplayer.get_remote_sender_id()
+	for id in multiplayer.get_peers():
+		if id != sender:
+			_rpc_remote_position.rpc_id(id, sender, pos)
+
+@rpc("authority", "unreliable")
 func _rpc_remote_position(id: int, pos: Vector3) -> void:
 	if remote_players.has(id):
 		remote_players[id].global_position = pos
