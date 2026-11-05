@@ -562,7 +562,7 @@ func _rpc_position(pos: Vector3) -> void:
 	if not multiplayer.is_server():
 		return
 	var id := multiplayer.get_remote_sender_id()
-	if remote_positions.has(id) and (remote_positions[id] as Vector3).distance_to(pos) > 18.0:
+	if remote_positions.has(id) and Vector3(remote_positions[id]).distance_to(pos) > 18.0:
 		return
 	remote_positions[id] = pos
 	_ensure_remote_player(id, pos)
