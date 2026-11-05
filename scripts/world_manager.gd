@@ -16,6 +16,8 @@ var harvested: Dictionary = {}
 var world_seconds := 0.0
 var weather_name := "Limpo"
 var weather_timer := 0.0
+var save_timer := 0.0
+var last_season_index := -1
 var sun: DirectionalLight3D
 var world_env: WorldEnvironment
 var rain: GPUParticles3D
@@ -33,14 +35,19 @@ func set_player(value: Node3D) -> void:
 func tick(delta: float, focus: Vector3) -> void:
 	world_seconds += delta
 	weather_timer += delta
+	save_timer += delta
+	if save_timer >= 30.0:
+		save_timer = 0.0
+		_save_state()
+	if last_season_index != _season_index():
+		last_season_index = _season_index()
+		_apply_season_visuals()
 	if weather_timer >= 100.0:
 		weather_timer = 0.0
 		_change_weather()
 	_update_sun()
 	_update_weather_visuals(focus)
 	update_chunks(focus)
-	if int(world_seconds) % 30 == 0:
-		_save_state()
 
 func update_chunks(focus: Vector3) -> void:
 	var center := Vector2i(floori(focus.x / CHUNK_SIZE), floori(focus.z / CHUNK_SIZE))
@@ -58,6 +65,9 @@ func update_chunks(focus: Vector3) -> void:
 	for key in remove_keys:
 		var node: Node3D = chunks[key]
 		if is_instance_valid(node):
+			for item in resources.duplicate():
+				if is_instance_valid(item) and item.get_parent() == node:
+					resources.erase(item)
 			node.queue_free()
 		chunks.erase(key)
 
@@ -75,6 +85,7 @@ func _create_chunk(cx: int, cz: int) -> Node3D:
 	ground_shape.shape = box
 	ground.add_child(ground_shape)
 	var ground_mesh := MeshInstance3D.new()
+	ground_mesh.name = "GroundMesh"
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(CHUNK_SIZE, CHUNK_SIZE)
 	ground_mesh.mesh = plane
@@ -116,6 +127,7 @@ func _create_resource(kind: String, id: String, pos: Vector3) -> Node3D:
 		trunk.material_override = _material(Color(0.34, 0.21, 0.12))
 		root.add_child(trunk)
 		var crown := MeshInstance3D.new()
+		crown.name = "TreeCrown"
 		var crown_mesh := ConeMesh.new()
 		crown_mesh.radius = 1.35
 		crown_mesh.height = 2.8
@@ -200,6 +212,28 @@ func _build_sky_and_weather() -> void:
 	drop.material = _material(Color(0.68, 0.79, 0.92, 0.7))
 	rain.draw_pass_1 = drop
 	add_child(rain)
+
+func _apply_season_visuals() -> void:
+	var ground_colors := [
+		Color(0.27, 0.43, 0.24),
+		Color(0.31, 0.43, 0.22),
+		Color(0.39, 0.36, 0.22),
+		Color(0.62, 0.67, 0.68)
+	]
+	var leaf_colors := [
+		Color(0.17, 0.39, 0.16),
+		Color(0.12, 0.32, 0.12),
+		Color(0.55, 0.27, 0.10),
+		Color(0.22, 0.29, 0.25)
+	]
+	for chunk in chunks.values():
+		if not is_instance_valid(chunk):
+			continue
+		for mesh_node in chunk.find_children("*", "MeshInstance3D", true, false):
+			if mesh_node.name == "GroundMesh":
+				mesh_node.material_override = _material(ground_colors[last_season_index])
+			elif mesh_node.name == "TreeCrown":
+				mesh_node.material_override = _material(leaf_colors[last_season_index])
 
 func _change_weather() -> void:
 	var season := _season_index()
