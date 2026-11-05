@@ -8,6 +8,8 @@ const SAVE_PATH := "user://ilha_viva_world.json"
 var peer := ENetMultiplayerPeer.new()
 var player: CharacterBody3D
 var camera: Camera3D
+var camera_pivot: Node3D
+var world_manager: Node
 var joystick := Vector2.ZERO
 var virtual_stick: Control
 var hud: Label
@@ -40,6 +42,7 @@ func _ready() -> void:
 		_start_dedicated_server()
 		return
 	_build_player()
+	world_manager.call("set_player", player)
 	_build_ui()
 	_setup_network_signals()
 	_update_hud()
@@ -55,7 +58,12 @@ func _process(delta: float) -> void:
 		if hunger <= 0.0 or thirst <= 0.0:
 			health = maxf(0.0, health - 2.0)
 		_update_hud()
-	_update_daylight()
+	if is_instance_valid(world_manager):
+		var focus := player.global_position if is_instance_valid(player) else Vector3.ZERO
+		world_manager.call("tick", delta, focus)
+		resources.clear()
+		for item in world_manager.get("resources"):
+			resources.append(item)
 	if not server_mode:
 		_sync_my_position()
 
@@ -69,9 +77,13 @@ func _physics_process(delta: float) -> void:
 	if joystick.length() > 0.12:
 		axis = joystick
 	axis = axis.limit_length(1.0)
-	var direction := Vector3(axis.x, 0.0, axis.y)
+	var direction := camera_pivot.global_basis * Vector3(axis.x, 0.0, axis.y)
+	direction.y = 0.0
+	direction = direction.normalized()
 	player.velocity.x = direction.x * 5.5
 	player.velocity.z = direction.z * 5.5
+	if direction.length() > 0.08:
+		player.rotation.y = lerp_angle(player.rotation.y, atan2(-direction.x, -direction.z), delta * 10.0)
 	if not player.is_on_floor():
 		player.velocity.y -= 22.0 * delta
 	else:
@@ -80,33 +92,12 @@ func _physics_process(delta: float) -> void:
 	_tick_local_zombies(delta)
 
 func _build_world() -> void:
-	_make_box(Vector3(0, -0.6, 0), Vector3(120, 1, 120), Color(0.27, 0.43, 0.25), true)
-	for i in range(105):
-		var p := Vector3(randf_range(-54, 54), 0, randf_range(-54, 54))
-		if Vector2(p.x, p.z).length() < 9.0:
-			continue
-		if i % 3 == 0:
-			_make_tree(p)
-		elif i % 3 == 1:
-			_make_rock(p)
-		else:
-			_make_food_plant(p)
+	world_manager = Node.new()
+	world_manager.name = "WorldManager"
+	world_manager.set_script(load("res://scripts/world_manager.gd"))
+	add_child(world_manager)
 	for i in range(12):
 		_spawn_zombie(Vector3(randf_range(-48, 48), 0.1, randf_range(-48, 48)))
-	var sun := DirectionalLight3D.new()
-	sun.name = "Sun"
-	sun.rotation_degrees = Vector3(-48, -25, 0)
-	sun.light_energy = 1.1
-	add_child(sun)
-	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_SKY
-	e.sky = Sky.new()
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.7, 0.78, 0.86)
-	e.ambient_light_energy = 0.7
-	env.environment = e
-	add_child(env)
 
 func _make_box(pos: Vector3, size: Vector3, color: Color, collision := false) -> Node3D:
 	var root: Node3D
@@ -167,27 +158,22 @@ func _build_player() -> void:
 	collision.position.y = 0.9
 	player.add_child(collision)
 
-	# Personagem humanoide low-poly: cabeça, tronco, braços e pernas.
-	# A colisão continua simples para manter bom desempenho em celulares.
 	var skin := _lowpoly_material(Color(0.78, 0.59, 0.43))
 	var shirt := _lowpoly_material(Color(0.24, 0.38, 0.27))
 	var pants := _lowpoly_material(Color(0.25, 0.29, 0.34))
 	var boots := _lowpoly_material(Color(0.16, 0.14, 0.12))
 	var hair := _lowpoly_material(Color(0.19, 0.15, 0.12))
-
-	_add_player_box("Torso", Vector3(0.0, 1.08, 0.0), Vector3(0.62, 0.72, 0.34), shirt)
-	_add_player_box("Pelvis", Vector3(0.0, 0.68, 0.0), Vector3(0.48, 0.25, 0.3), pants)
-	_add_player_box("LeftLeg", Vector3(-0.16, 0.34, 0.0), Vector3(0.22, 0.52, 0.25), pants)
-	_add_player_box("RightLeg", Vector3(0.16, 0.34, 0.0), Vector3(0.22, 0.52, 0.25), pants)
+	_add_player_box("Torso", Vector3(0, 1.08, 0), Vector3(0.62, 0.72, 0.34), shirt)
+	_add_player_box("Pelvis", Vector3(0, 0.68, 0), Vector3(0.48, 0.25, 0.3), pants)
+	_add_player_box("LeftLeg", Vector3(-0.16, 0.34, 0), Vector3(0.22, 0.52, 0.25), pants)
+	_add_player_box("RightLeg", Vector3(0.16, 0.34, 0), Vector3(0.22, 0.52, 0.25), pants)
 	_add_player_box("LeftBoot", Vector3(-0.16, 0.09, -0.045), Vector3(0.25, 0.16, 0.36), boots)
 	_add_player_box("RightBoot", Vector3(0.16, 0.09, -0.045), Vector3(0.25, 0.16, 0.36), boots)
-	_add_player_box("LeftArm", Vector3(-0.43, 1.08, 0.0), Vector3(0.2, 0.65, 0.25), shirt)
-	_add_player_box("RightArm", Vector3(0.43, 1.08, 0.0), Vector3(0.2, 0.65, 0.25), shirt)
-	_add_player_box("LeftHand", Vector3(-0.43, 0.69, 0.0), Vector3(0.17, 0.16, 0.18), skin)
-	_add_player_box("RightHand", Vector3(0.43, 0.69, 0.0), Vector3(0.17, 0.16, 0.18), skin)
-
+	_add_player_box("LeftArm", Vector3(-0.43, 1.08, 0), Vector3(0.2, 0.65, 0.25), shirt)
+	_add_player_box("RightArm", Vector3(0.43, 1.08, 0), Vector3(0.2, 0.65, 0.25), shirt)
+	_add_player_box("LeftHand", Vector3(-0.43, 0.69, 0), Vector3(0.17, 0.16, 0.18), skin)
+	_add_player_box("RightHand", Vector3(0.43, 0.69, 0), Vector3(0.17, 0.16, 0.18), skin)
 	var head := MeshInstance3D.new()
-	head.name = "Head"
 	var head_mesh := SphereMesh.new()
 	head_mesh.radius = 0.24
 	head_mesh.height = 0.48
@@ -195,17 +181,24 @@ func _build_player() -> void:
 	head_mesh.rings = 4
 	head.mesh = head_mesh
 	head.material_override = skin
-	head.position = Vector3(0.0, 1.66, 0.0)
+	head.position = Vector3(0, 1.66, 0)
 	player.add_child(head)
-	_add_player_box("Hair", Vector3(0.0, 1.84, 0.015), Vector3(0.34, 0.1, 0.32), hair)
+	_add_player_box("Hair", Vector3(0, 1.84, 0.015), Vector3(0.34, 0.1, 0.32), hair)
 
 	player.position = Vector3(0, 0.1, 0)
 	add_child(player)
+	camera_pivot = Node3D.new()
+	camera_pivot.name = "ThirdPersonCameraPivot"
+	camera_pivot.position = Vector3(0, 1.45, 0)
+	player.add_child(camera_pivot)
+	var arm := SpringArm3D.new()
+	arm.spring_length = 5.5
+	arm.margin = 0.2
+	camera_pivot.add_child(arm)
 	camera = Camera3D.new()
-	camera.position = Vector3(0, 10, 12)
-	camera.rotation_degrees = Vector3(-38, 0, 0)
-	player.add_child(camera)
+	arm.add_child(camera)
 	camera.current = true
+	camera_pivot.rotation_degrees.x = -12.0
 
 func _lowpoly_material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
@@ -268,6 +261,20 @@ func _build_ui() -> void:
 	virtual_stick.visible = OS.has_feature("mobile")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if event.pressed else Input.MOUSE_MODE_VISIBLE
+		return
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		camera_pivot.rotation.y -= event.relative.x * 0.003
+		camera_pivot.rotation.x = clampf(camera_pivot.rotation.x - event.relative.y * 0.003, -0.85, 0.25)
+		return
+	if event is InputEventScreenDrag and event.position.x > get_viewport().get_visible_rect().size.x * 0.42:
+		camera_pivot.rotation.y -= event.relative.x * 0.004
+		camera_pivot.rotation.x = clampf(camera_pivot.rotation.x - event.relative.y * 0.004, -0.85, 0.25)
+		return
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
 	# Atalhos para teclado no PC; os botões da interface continuam funcionando.
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
@@ -313,15 +320,20 @@ func _gather() -> void:
 		return
 	if nearest.is_in_group("wood_node"):
 		wood += 3
+		_emit_noise(player.global_position, 26.0)
 		_show("+3 madeira")
 	elif nearest.is_in_group("stone_node"):
 		stone += 2
+		_emit_noise(player.global_position, 18.0)
 		_show("+2 pedras")
 	elif nearest.is_in_group("food_node"):
 		food += 2
 		_show("+2 alimentos")
-	resources.erase(nearest)
-	nearest.queue_free()
+	if is_instance_valid(world_manager):
+		world_manager.call("harvest", nearest)
+	else:
+		resources.erase(nearest)
+		nearest.queue_free()
 	_update_hud()
 
 func _eat() -> void:
@@ -354,6 +366,7 @@ func _build_base_piece() -> void:
 		return
 	wood -= 5
 	stone -= 2
+	_emit_noise(player.global_position, 34.0)
 	var pos := player.global_position + Vector3(0, 1.0, -3.0)
 	var piece := _make_box(pos, Vector3(4, 2, 0.3), Color(0.36, 0.24, 0.14), true)
 	piece.add_to_group("player_base")
@@ -410,8 +423,15 @@ func _tick_local_zombies(delta: float) -> void:
 	for z in zombies:
 		if not is_instance_valid(z):
 			continue
-		var offset := player.global_position - z.global_position
-		if offset.length() < 18.0:
+		var target_position := player.global_position
+		var investigate_left := float(z.get_meta("investigate_left", 0.0))
+		if investigate_left > 0.0:
+			investigate_left -= delta
+			z.set_meta("investigate_left", investigate_left)
+			target_position = z.get_meta("heard_position", player.global_position)
+		var offset := target_position - z.global_position
+		var player_distance := player.global_position.distance_to(z.global_position)
+		if investigate_left > 0.0 or player_distance < 18.0:
 			var dir := offset.normalized()
 			z.velocity.x = dir.x * 2.0
 			z.velocity.z = dir.z * 2.0
@@ -420,12 +440,20 @@ func _tick_local_zombies(delta: float) -> void:
 			else:
 				z.velocity.y = -0.4
 			z.move_and_slide()
-			if offset.length() < 1.25:
+			if player_distance < 1.25:
 				health = maxf(0, health - 8.0 * delta)
 	_update_hud()
 
-func _server_zombie_tick(_delta: float) -> void:
-	pass
+func _server_zombie_tick(delta: float) -> void:
+	_tick_local_zombies(delta)
+
+func _emit_noise(origin: Vector3, radius: float) -> void:
+	for z in zombies:
+		if not is_instance_valid(z):
+			continue
+		if z.global_position.distance_to(origin) <= radius:
+			z.set_meta("heard_position", origin)
+			z.set_meta("investigate_left", 9.0)
 
 func _show(text_value: String) -> void:
 	if is_instance_valid(notice):
