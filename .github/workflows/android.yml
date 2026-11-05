@@ -1,4 +1,4 @@
-name: Android APK
+name: Build PC and Android
 
 on:
   workflow_dispatch:
@@ -19,18 +19,30 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-      - name: Export Godot project
+      - name: Export Godot builds
         uses: firebelley/godot-export@v6.0.0
         with:
           godot_executable_download_url: https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
           godot_export_templates_download_url: https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz
           relative_project_path: ./
           relative_export_path: ./build
-          presets_to_export: Android
+          presets_to_export: Windows Desktop,Linux Desktop,Android
           export_debug: true
-      - name: Upload APK
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ilha-viva-windows
+          path: build/IlhaViva-Windows.exe
+          if-no-files-found: error
+      - name: Upload Linux build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ilha-viva-linux
+          path: build/IlhaViva-Linux.x86_64
+          if-no-files-found: error
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: ilha-viva-android
-          path: build/*.apk
+          path: build/IlhaViva.apk
           if-no-files-found: error
