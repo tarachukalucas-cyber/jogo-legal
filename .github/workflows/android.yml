@@ -24,13 +24,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ilha-viva-windows
-          path: build/IlhaViva-Windows.exe
+          path: build/Windows Desktop/IlhaViva-Windows.exe
           if-no-files-found: error
       - name: Enviar versão Linux
         uses: actions/upload-artifact@v4
         with:
           name: ilha-viva-linux
-          path: build/IlhaViva-Linux.x86_64
+          path: build/Linux Desktop/IlhaViva-Linux.x86_64
           if-no-files-found: error
 
   android:
