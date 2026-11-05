@@ -264,6 +264,26 @@ func _build_ui() -> void:
 	virtual_stick.custom_minimum_size = Vector2(200, 200)
 	layer.add_child(virtual_stick)
 	virtual_stick.direction_changed.connect(func(v: Vector2): joystick = v)
+	# O joystick virtual aparece apenas em aparelhos com tela touch.
+	virtual_stick.visible = OS.has_feature("mobile")
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Atalhos para teclado no PC; os botões da interface continuam funcionando.
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	match event.keycode:
+		KEY_E:
+			_gather()
+		KEY_F:
+			_eat()
+		KEY_G:
+			_drink()
+		KEY_C:
+			_craft()
+		KEY_B:
+			_build_base_piece()
+		KEY_SPACE:
+			_attack()
 
 func _add_button(parent: HBoxContainer, caption: String, callback: Callable) -> void:
 	var b := Button.new()
