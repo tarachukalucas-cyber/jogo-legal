@@ -33,6 +33,7 @@ var guild_members: Array[String] = []
 var world_data := {"guilds": {}, "bases": []}
 var server_mode := false
 var last_attack := 0.0
+var network_send_timer := 0.0
 
 func _ready() -> void:
 	server_mode = OS.get_cmdline_user_args().has("--server")
@@ -65,7 +66,10 @@ func _process(delta: float) -> void:
 		for item in world_manager.get("resources"):
 			resources.append(item)
 	if not server_mode:
-		_sync_my_position()
+		network_send_timer += delta
+		if network_send_timer >= 0.05:
+			network_send_timer = 0.0
+			_sync_my_position()
 
 func _physics_process(delta: float) -> void:
 	if server_mode:
@@ -239,7 +243,8 @@ func _build_ui() -> void:
 	_add_button(actions2, "Construir", _build_base_piece)
 	_add_button(actions2, "Ataque", _attack)
 	_add_button(actions2, "Guilda", _guild_dialog)
-	_add_button(actions2, "Servidor", _join_dialog)
+	_add_button(actions2, "Criar sala", _host_game)
+	_add_button(actions2, "Entrar", _join_dialog)
 	notice = Label.new()
 	notice.position = Vector2(14, 232)
 	notice.add_theme_color_override("font_color", Color.WHITE)
@@ -301,7 +306,10 @@ func _add_button(parent: HBoxContainer, caption: String, callback: Callable) -> 
 
 func _update_hud() -> void:
 	if is_instance_valid(hud):
-		hud.text = "VIDA %d  FOME %d  SEDE %d  ENERGIA %d\nMadeira %d | Pedra %d | Comida %d | Tecido %d" % [int(health), int(hunger), int(thirst), int(stamina), wood, stone, food, cloth]
+		var climate := ""
+		if is_instance_valid(world_manager):
+			climate = "\nDia %d • %s • %s • %s" % [world_manager.call("get_day_number"), world_manager.call("get_season"), world_manager.call("get_time_text"), world_manager.get("weather_name")]
+		hud.text = "VIDA %d  FOME %d  SEDE %d  ENERGIA %d\nMadeira %d | Pedra %d | Comida %d | Tecido %d%s" % [int(health), int(hunger), int(thirst), int(stamina), wood, stone, food, cloth, climate]
 
 func _gather() -> void:
 	if not is_instance_valid(player):
@@ -445,7 +453,26 @@ func _tick_local_zombies(delta: float) -> void:
 	_update_hud()
 
 func _server_zombie_tick(delta: float) -> void:
-	_tick_local_zombies(delta)
+	if remote_positions.is_empty():
+		return
+	for z in zombies:
+		if not is_instance_valid(z):
+			continue
+		var nearest_position := Vector3.ZERO
+		var nearest_distance := INF
+		for pos in remote_positions.values():
+			var distance := z.global_position.distance_to(pos)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				nearest_position = pos
+		if nearest_distance < 22.0:
+			var direction := nearest_position - z.global_position
+			direction.y = 0.0
+			direction = direction.normalized()
+			z.velocity.x = direction.x * 2.0
+			z.velocity.z = direction.z * 2.0
+			z.velocity.y = -0.5 if z.is_on_floor() else z.velocity.y - 20.0 * delta
+			z.move_and_slide()
 
 func _emit_noise(origin: Vector3, radius: float) -> void:
 	for z in zombies:
@@ -506,6 +533,8 @@ func _join_dialog() -> void:
 
 func _on_peer_connected(id: int) -> void:
 	print("Player connected: ", id)
+	for existing_id in remote_positions.keys():
+		rpc_id(id, "_rpc_remote_position", int(existing_id), remote_positions[existing_id])
 	if not server_mode:
 		_show("Jogador conectado: %d" % id)
 
@@ -516,16 +545,48 @@ func _on_peer_disconnected(id: int) -> void:
 	remote_positions.erase(id)
 
 func _sync_my_position() -> void:
-	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
+	if multiplayer.multiplayer_peer == null or not is_instance_valid(player):
 		return
-	_rpc_position.rpc_id(1, player.global_position)
+	var my_id := multiplayer.get_unique_id()
+	if multiplayer.is_server():
+		remote_positions[my_id] = player.global_position
+		_ensure_remote_player(my_id, player.global_position)
+		rpc("_rpc_remote_position", my_id, player.global_position)
+	else:
+		_rpc_position.rpc_id(1, player.global_position)
 
 @rpc("any_peer", "unreliable")
 func _rpc_position(pos: Vector3) -> void:
 	if not multiplayer.is_server():
 		return
 	var id := multiplayer.get_remote_sender_id()
+	if remote_positions.has(id) and (remote_positions[id] as Vector3).distance_to(pos) > 18.0:
+		return
 	remote_positions[id] = pos
+	_ensure_remote_player(id, pos)
+	rpc("_rpc_remote_position", id, pos)
+
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_remote_position(id: int, pos: Vector3) -> void:
+	if id == multiplayer.get_unique_id():
+		return
+	_ensure_remote_player(id, pos)
+
+func _ensure_remote_player(id: int, pos: Vector3) -> void:
+	if not remote_players.has(id):
+		var avatar := Node3D.new()
+		avatar.name = "RemotePlayer_%d" % id
+		var body := MeshInstance3D.new()
+		var body_mesh := CapsuleMesh.new()
+		body_mesh.radius = 0.34
+		body_mesh.height = 1.75
+		body.mesh = body_mesh
+		body.material_override = _lowpoly_material(Color(0.68, 0.74, 0.78))
+		body.position.y = 0.88
+		avatar.add_child(body)
+		add_child(avatar)
+		remote_players[id] = avatar
+	remote_players[id].global_position = pos
 
 func _guild_dialog() -> void:
 	var dialog := AcceptDialog.new()
