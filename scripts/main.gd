@@ -547,7 +547,7 @@ func _on_peer_disconnected(id: int) -> void:
 	remote_positions.erase(id)
 
 func _sync_my_position() -> void:
-	if multiplayer.multiplayer_peer == null or not is_instance_valid(player):
+	if multiplayer.multiplayer_peer is OfflineMultiplayerPeer or not is_instance_valid(player):
 		return
 	var my_id := multiplayer.get_unique_id()
 	if multiplayer.is_server():
@@ -575,6 +575,8 @@ func _rpc_remote_position(id: int, pos: Vector3) -> void:
 	_ensure_remote_player(id, pos)
 
 func _ensure_remote_player(id: int, pos: Vector3) -> void:
+	if not server_mode and id == multiplayer.get_unique_id():
+		return
 	if not remote_players.has(id):
 		var avatar := Node3D.new()
 		avatar.name = "RemotePlayer_%d" % id
