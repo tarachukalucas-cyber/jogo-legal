@@ -89,6 +89,7 @@ func _create_chunk(cx: int, cz: int) -> Node3D:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(CHUNK_SIZE, CHUNK_SIZE)
 	ground_mesh.mesh = plane
+	ground_mesh.position.y = 0.55
 	var ground_mat := StandardMaterial3D.new()
 	ground_mat.albedo_color = Color(0.24, 0.39, 0.22)
 	ground_mat.roughness = 1.0
