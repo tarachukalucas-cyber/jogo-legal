@@ -1,41 +1,40 @@
-# Ilha Viva — Survival Mobile
+# Ilha Viva — Survival para PC e Android
 
-Protótipo original de sobrevivência 3D para Android.
+Protótipo original de sobrevivência 3D para computador e celular.
 
-## Identidade visual
-- Jogador branco minimalista em formato de feijão/cápsula, sem rosto nem roupas.
-- Zumbis low-poly e ilha aberta com árvores, rochas e plantas coletáveis.
+## Controles
+
+### PC
+- WASD: movimentar
+- E: coletar recursos
+- F: comer
+- G: beber
+- C: craft
+- B: construir parede
+- Espaço: atacar zumbi
+- Também é possível usar os botões da interface com o mouse.
+
+### Celular
+- Joystick virtual: movimentar
+- Botões na tela: coletar, comer, beber, craft, construir e atacar
 
 ## Sistemas no protótipo
+- Personagem humanoide low-poly.
 - Fome, sede, vida e energia.
-- Coleta de madeira, pedra e alimentos próximos.
-- Receita inicial: 2 madeiras + 1 pedra = kit de reparo.
-- Construção de paredes para iniciar uma base.
-- Zumbis que perseguem o jogador e causam dano ao se aproximar.
-- Ciclo visual de dia/noite e joystick touch.
-- Conexão por IP e modo ENet dedicado experimental.
-- Criação local de guilda salva no arquivo de mundo.
+- Coleta de madeira, pedra e alimentos.
+- Receita inicial e construção de paredes.
+- Zumbis que perseguem o jogador.
+- Ciclo visual de dia/noite.
+- Conexão ENet experimental e criação local de guilda.
 
-## Estado real do multiplayer
-O código contém uma base experimental de conexão ENet, mas ainda não é um MMO funcional. PvP sincronizado, guildas compartilhadas entre clientes, inventário autoritativo, persistência completa de jogadores/bases e replicação de zumbis ainda precisam ser implementados e testados. Não use o protótipo como servidor público de produção.
+## Limitações conhecidas
+O multiplayer ainda é experimental: não há sincronização completa de jogadores, zumbis, PvP, guildas compartilhadas ou persistência completa. Não é um MMO pronto para produção. Servidor 24/7 exige uma máquina/VPS sempre ligada; GitHub Actions apenas compila os arquivos.
 
-## Servidor 24 horas
-Um servidor 24/7 precisa rodar em uma máquina sempre ligada (VPS/servidor dedicado). GitHub Actions compila e armazena artefatos; não mantém o jogo hospedado continuamente. Consulte server/README.md. Porta padrão: UDP 24517.
+## Abrir no Godot
+1. Instale Godot 4.4.1.
+2. Baixe o código pelo botão **Code > Download ZIP** deste repositório.
+3. Extraia o ZIP e abra `project.godot` no Godot.
+4. Pressione F6/F5 para executar.
 
-## Abrir
-1. Instale Godot 4.4.1 ou superior.
-2. Abra project.godot.
-3. Execute a cena principal.
-
-## Android
-O preset Android usa ARM64. O APK depende de exportação concluída no GitHub Actions e ainda precisa ser testado em aparelho físico.
-
-## Próximas etapas
-1. Servidor dedicado Linux com estado autoritativo e salvamento automático.
-2. Sincronização de jogadores, zumbis, itens e construção.
-3. PvP com validação de alcance, cooldown e vida no servidor.
-4. Guildas persistentes, convites, cargos e proteção de bases.
-5. Inventário, receitas, ferramentas e equipamentos.
-6. Testes de rede, segurança e desempenho.
-
-Licença MIT para o código original.
+## Builds para testar
+O workflow **Build PC and Android** gera os artefatos Windows, Linux e Android. Após uma execução bem-sucedida, abra a execução em **Actions** e baixe o artefato correspondente em **Artifacts**.
