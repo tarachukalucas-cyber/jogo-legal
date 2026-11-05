@@ -40,6 +40,8 @@ func _ready() -> void:
 	_load_world()
 	_build_world()
 	if server_mode:
+		_setup_network_signals()
+	if server_mode:
 		_start_dedicated_server()
 		return
 	_build_player()
