@@ -158,27 +158,47 @@ func _make_food_plant(pos: Vector3) -> void:
 
 func _build_player() -> void:
 	player = CharacterBody3D.new()
-	player.name = "PlayerBean"
+	player.name = "Player"
 	var collision := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
-	capsule.radius = 0.48
-	capsule.height = 1.45
+	capsule.radius = 0.34
+	capsule.height = 1.8
 	collision.shape = capsule
-	collision.position.y = 0.72
+	collision.position.y = 0.9
 	player.add_child(collision)
-	# Avatar minimalista: somente o formato branco de um feijão, sem rosto ou roupa.
-	var bean := MeshInstance3D.new()
-	var bean_mesh := CapsuleMesh.new()
-	bean_mesh.radius = 0.48
-	bean_mesh.height = 1.45
-	bean.mesh = bean_mesh
-	var white := StandardMaterial3D.new()
-	white.albedo_color = Color(0.97, 0.97, 0.94)
-	white.roughness = 0.82
-	bean.material_override = white
-	bean.position.y = 0.72
-	bean.scale = Vector3(0.92, 1.0, 0.82)
-	player.add_child(bean)
+
+	# Personagem humanoide low-poly: cabeça, tronco, braços e pernas.
+	# A colisão continua simples para manter bom desempenho em celulares.
+	var skin := _lowpoly_material(Color(0.78, 0.59, 0.43))
+	var shirt := _lowpoly_material(Color(0.24, 0.38, 0.27))
+	var pants := _lowpoly_material(Color(0.25, 0.29, 0.34))
+	var boots := _lowpoly_material(Color(0.16, 0.14, 0.12))
+	var hair := _lowpoly_material(Color(0.19, 0.15, 0.12))
+
+	_add_player_box("Torso", Vector3(0.0, 1.08, 0.0), Vector3(0.62, 0.72, 0.34), shirt)
+	_add_player_box("Pelvis", Vector3(0.0, 0.68, 0.0), Vector3(0.48, 0.25, 0.3), pants)
+	_add_player_box("LeftLeg", Vector3(-0.16, 0.34, 0.0), Vector3(0.22, 0.52, 0.25), pants)
+	_add_player_box("RightLeg", Vector3(0.16, 0.34, 0.0), Vector3(0.22, 0.52, 0.25), pants)
+	_add_player_box("LeftBoot", Vector3(-0.16, 0.09, -0.045), Vector3(0.25, 0.16, 0.36), boots)
+	_add_player_box("RightBoot", Vector3(0.16, 0.09, -0.045), Vector3(0.25, 0.16, 0.36), boots)
+	_add_player_box("LeftArm", Vector3(-0.43, 1.08, 0.0), Vector3(0.2, 0.65, 0.25), shirt)
+	_add_player_box("RightArm", Vector3(0.43, 1.08, 0.0), Vector3(0.2, 0.65, 0.25), shirt)
+	_add_player_box("LeftHand", Vector3(-0.43, 0.69, 0.0), Vector3(0.17, 0.16, 0.18), skin)
+	_add_player_box("RightHand", Vector3(0.43, 0.69, 0.0), Vector3(0.17, 0.16, 0.18), skin)
+
+	var head := MeshInstance3D.new()
+	head.name = "Head"
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.24
+	head_mesh.height = 0.48
+	head_mesh.radial_segments = 7
+	head_mesh.rings = 4
+	head.mesh = head_mesh
+	head.material_override = skin
+	head.position = Vector3(0.0, 1.66, 0.0)
+	player.add_child(head)
+	_add_player_box("Hair", Vector3(0.0, 1.84, 0.015), Vector3(0.34, 0.1, 0.32), hair)
+
 	player.position = Vector3(0, 0.1, 0)
 	add_child(player)
 	camera = Camera3D.new()
@@ -186,6 +206,22 @@ func _build_player() -> void:
 	camera.rotation_degrees = Vector3(-38, 0, 0)
 	player.add_child(camera)
 	camera.current = true
+
+func _lowpoly_material(color: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.roughness = 0.9
+	return mat
+
+func _add_player_box(part_name: String, local_pos: Vector3, part_size: Vector3, material: Material) -> void:
+	var part := MeshInstance3D.new()
+	part.name = part_name
+	var mesh := BoxMesh.new()
+	mesh.size = part_size
+	part.mesh = mesh
+	part.material_override = material
+	part.position = local_pos
+	player.add_child(part)
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
