@@ -109,6 +109,7 @@ func _create_chunk(cx: int, cz: int) -> Node3D:
 		var item := _create_resource(kind, id, world_pos)
 		root.add_child(item)
 		resources.append(item)
+	_apply_season_to_chunk(root)
 	return root
 
 func _create_resource(kind: String, id: String, pos: Vector3) -> Node3D:
@@ -214,6 +215,12 @@ func _build_sky_and_weather() -> void:
 	add_child(rain)
 
 func _apply_season_visuals() -> void:
+	for chunk in chunks.values():
+		if is_instance_valid(chunk):
+			_apply_season_to_chunk(chunk)
+
+func _apply_season_to_chunk(chunk: Node3D) -> void:
+	var season := _season_index()
 	var ground_colors := [
 		Color(0.27, 0.43, 0.24),
 		Color(0.31, 0.43, 0.22),
@@ -226,14 +233,11 @@ func _apply_season_visuals() -> void:
 		Color(0.55, 0.27, 0.10),
 		Color(0.22, 0.29, 0.25)
 	]
-	for chunk in chunks.values():
-		if not is_instance_valid(chunk):
-			continue
-		for mesh_node in chunk.find_children("*", "MeshInstance3D", true, false):
-			if mesh_node.name == "GroundMesh":
-				mesh_node.material_override = _material(ground_colors[last_season_index])
-			elif mesh_node.name == "TreeCrown":
-				mesh_node.material_override = _material(leaf_colors[last_season_index])
+	for mesh_node in chunk.find_children("*", "MeshInstance3D", true, false):
+		if mesh_node.name == "GroundMesh":
+			mesh_node.material_override = _material(ground_colors[season])
+		elif mesh_node.name == "TreeCrown":
+			mesh_node.material_override = _material(leaf_colors[season])
 
 func _change_weather() -> void:
 	var season := _season_index()
@@ -248,7 +252,7 @@ func _update_sun() -> void:
 	var day_progress := fposmod(world_seconds, DAY_LENGTH) / DAY_LENGTH
 	sun.rotation_degrees.x = -90.0 + day_progress * 360.0
 	var daylight := clampf(sin(day_progress * TAU) * 1.5 + 0.25, 0.08, 1.0)
-	sun.light_energy = daylight
+	sun.light_energy = daylight * (0.55 if weather_name == "Tempestade" else 1.0)
 	var env := world_env.environment
 	env.ambient_light_energy = 0.22 + daylight * 0.55
 
@@ -257,8 +261,6 @@ func _update_weather_visuals(focus: Vector3) -> void:
 	rain.emitting = weather_name == "Chuva" or weather_name == "Tempestade"
 	var env := world_env.environment
 	env.fog_density = 0.004 if weather_name == "Neblina" else (0.0025 if weather_name == "Tempestade" else 0.001)
-	if weather_name == "Tempestade":
-		sun.light_energy *= 0.55
 
 func get_season() -> String:
 	return SEASONS[_season_index()]
